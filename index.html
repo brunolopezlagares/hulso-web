@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="HULSO - Coming soon">
+  <title>HULSO</title>
+  <style>
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+    :root {
+      --bg: #0a0a0a;
+      --subtitle-color: rgba(255, 255, 255, 0.6);
+    }
+    @media (prefers-color-scheme: light) {
+      :root {
+        --bg: #f5f5f0;
+        --subtitle-color: rgba(0, 0, 0, 0.5);
+      }
+    }
+
+    body {
+      width: 100vw;
+      height: 100vh;
+      overflow: hidden;
+      background: var(--bg);
+      font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+    }
+
+    canvas { display: block; }
+
+    .overlay {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      pointer-events: none;
+    }
+
+    .subtitle {
+      position: absolute;
+      bottom: 15%;
+      font-size: clamp(0.75rem, 1.5vw, 0.95rem);
+      font-weight: 300;
+      letter-spacing: 0.4em;
+      text-transform: uppercase;
+      color: var(--subtitle-color);
+      opacity: 0;
+      animation: fadeIn 1.5s ease-out 2s forwards;
+    }
+
+    @keyframes fadeIn {
+      to { opacity: 1; }
+    }
+
+    .fallback-title {
+      font-size: clamp(3rem, 12vw, 8rem);
+      font-weight: 900;
+      letter-spacing: 0.08em;
+      color: var(--subtitle-color);
+    }
+  </style>
+</head>
+<body>
+  <canvas id="scene"></canvas>
+  <div class="overlay">
+    <div class="subtitle">Coming soon</div>
+  </div>
+
+  <noscript>
+    <style>
+      canvas { display: none; }
+      .overlay .subtitle { display: none; }
+    </style>
+    <div class="overlay">
+      <div class="fallback-title">HULSO</div>
+      <div class="subtitle" style="opacity:1;animation:none">Coming soon</div>
+    </div>
+  </noscript>
+
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://unpkg.com/three@0.170.0/build/three.module.js",
+      "three/addons/": "https://unpkg.com/three@0.170.0/examples/jsm/"
+    }
+  }
+  </script>
+
+  <script type="module">
+    import * as THREE from 'three';
+    import { FontLoader } from 'three/addons/loaders/FontLoader.js';
+    import { TextGeometry } from 'three/addons/geometries/TextGeometry.js';
+
+    // --- WebGL check ---
+    const testCanvas = document.createElement('canvas');
+    const gl = testCanvas.getContext('webgl2') || testCanvas.getContext('webgl');
+    if (!gl) {
+      const overlay = document.querySelector('.overlay');
+      overlay.innerHTML =
+        '<div class="fallback-title">HULSO</div>' +
+        '<div class="subtitle" style="opacity:1;animation:none">Coming soon</div>';
+      throw new Error('WebGL not supported');
+    }
+
+    // --- Color scheme ---
+    const isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    const bgColor = isDark ? 0x0a0a0a : 0xf5f5f0;
+    const textColor = isDark ? 0xfafafa : 0x333333;
+
+    // --- Scene ---
+    const canvas = document.getElementById('scene');
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(bgColor);
+
+    // --- Camera ---
+    const camera = new THREE.PerspectiveCamera(
+      45,
+      window.innerWidth / window.innerHeight,
+      0.1,
+      1000
+    );
+    const aspect = window.innerWidth / window.innerHeight;
+    camera.position.z = aspect < 1 ? 18 : 8;
+
+    // --- Renderer ---
+    const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+
+    // --- Lighting ---
+    scene.add(new THREE.AmbientLight(0xffffff, isDark ? 1.5 : 0.6));
+
+    const mainLight = new THREE.DirectionalLight(0xffffff, isDark ? 2.0 : 1.2);
+    mainLight.position.set(5, 5, 5);
+    scene.add(mainLight);
+
+    const fillLight = new THREE.DirectionalLight(0xffffff, isDark ? 1.5 : 0.3);
+    fillLight.position.set(-3, 2, 4);
+    scene.add(fillLight);
+
+    const backLight = new THREE.DirectionalLight(0xffffff, isDark ? 0.5 : 0.2);
+    backLight.position.set(-5, -3, -5);
+    scene.add(backLight);
+
+    // --- Text group ---
+    const textGroup = new THREE.Group();
+    scene.add(textGroup);
+
+    // --- Material ---
+    const textMaterial = new THREE.MeshStandardMaterial({
+      color: textColor,
+      metalness: isDark ? 0.3 : 0.85,
+      roughness: isDark ? 0.45 : 0.15,
+    });
+
+    // --- Mouse tracking ---
+    const mouse = { x: 0, y: 0 };
+    document.addEventListener('mousemove', (e) => {
+      mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
+      mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
+    });
+    document.addEventListener('touchmove', (e) => {
+      const t = e.touches[0];
+      mouse.x = (t.clientX / window.innerWidth) * 2 - 1;
+      mouse.y = -(t.clientY / window.innerHeight) * 2 + 1;
+    }, { passive: true });
+
+    // --- Clock ---
+    const clock = new THREE.Clock();
+
+    // --- Load font + create 3D text ---
+    const fontLoader = new FontLoader();
+    fontLoader.load(
+      'https://unpkg.com/three@0.170.0/examples/fonts/helvetiker_bold.typeface.json',
+      (font) => {
+        const geometry = new TextGeometry('HULSO', {
+          font,
+          size: 1.2,
+          depth: 0.35,
+          curveSegments: 12,
+          bevelEnabled: true,
+          bevelThickness: 0.03,
+          bevelSize: 0.02,
+          bevelSegments: 5,
+        });
+        geometry.computeBoundingBox();
+        geometry.center();
+
+        const mesh = new THREE.Mesh(geometry, textMaterial);
+
+        // Entrance: start at scale 0, transparent
+        mesh.scale.set(0.01, 0.01, 0.01);
+        textMaterial.transparent = true;
+        textMaterial.opacity = 0;
+        textGroup.add(mesh);
+
+        // Animate entrance
+        const startTime = clock.getElapsedTime();
+        const duration = 1.5;
+
+        function animateEntrance() {
+          const progress = Math.min((clock.getElapsedTime() - startTime) / duration, 1);
+          const eased = 1 - Math.pow(1 - progress, 3);
+          mesh.scale.setScalar(eased);
+          textMaterial.opacity = eased;
+
+          if (progress < 1) {
+            requestAnimationFrame(animateEntrance);
+          } else {
+            textMaterial.transparent = false;
+            textMaterial.opacity = 1;
+          }
+        }
+        animateEntrance();
+      }
+    );
+
+    // --- Resize ---
+    window.addEventListener('resize', () => {
+      const newAspect = window.innerWidth / window.innerHeight;
+      camera.aspect = newAspect;
+      camera.position.z = newAspect < 1 ? 18 : 8;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+
+    // --- Animate ---
+    function animate() {
+      requestAnimationFrame(animate);
+      const elapsed = clock.getElapsedTime();
+
+      // Idle rotation + mouse parallax
+      const idleY = Math.sin(elapsed * 0.3) * 0.05;
+      const idleX = Math.sin(elapsed * 0.2) * 0.02;
+      const targetRotY = mouse.x * 0.25 + idleY;
+      const targetRotX = -mouse.y * 0.12 + idleX;
+      textGroup.rotation.y += (targetRotY - textGroup.rotation.y) * 0.05;
+      textGroup.rotation.x += (targetRotX - textGroup.rotation.x) * 0.05;
+
+      renderer.render(scene, camera);
+    }
+    animate();
+  </script>
+</body>
+</html>
